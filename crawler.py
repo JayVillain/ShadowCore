@@ -1,3 +1,5 @@
+# crawler.py (versi diperbaiki)
+
 import socket
 import requests
 import csv
@@ -15,9 +17,10 @@ def scan_port(ip, port):
     finally:
         s.close()
 
-def get_web_info(ip):
+def get_web_info(ip, port):
+    protocol = "https" if port == 443 else "http"
     try:
-        response = requests.get(f"http://{ip}", timeout=2, headers={'User-Agent': 'ShadowCore-Crawler'})
+        response = requests.get(f"{protocol}://{ip}", timeout=2, headers={'User-Agent': 'ShadowCore-Crawler'}, verify=False) # verify=False untuk HTTPS
         if response.status_code == 200:
             title = None
             if "<title>" in response.text:
@@ -28,6 +31,8 @@ def get_web_info(ip):
             app = None
             if 'wp-content' in response.text or 'WordPress' in response.text:
                 app = "WordPress"
+            elif 'cloudflare' in response.headers.get('Server', '').lower():
+                app = "Cloudflare"
 
             header_str = str(response.headers)
             body_str = response.text
@@ -43,8 +48,8 @@ def get_web_info(ip):
     return None
 
 def main():
-    target_ips = ["8.8.8.8", "8.8.4.4", "1.1.1.1"] # Ganti dengan IP yang ingin Anda pindai
-    ports_to_scan = [80]
+    target_ips = ["1.1.1.1", "8.8.8.8"] # Contoh IP. Ganti dengan rentang IP yang ingin Anda pindai.
+    ports_to_scan = [80, 443]
     
     results = []
     
@@ -57,15 +62,15 @@ def main():
         for port in ports_to_scan:
             if scan_port(ip, port):
                 print(f"Port {port} terbuka!")
-                web_info = get_web_info(ip)
+                web_info = get_web_info(ip, port)
                 if web_info:
                     results.append({
                         "ip": ip,
                         "port": port,
-                        "title": web_info.get("title"),
-                        "app": web_info.get("app"),
-                        "header": web_info.get("header"),
-                        "body": web_info.get("body")
+                        "title": web_info.get("title", ""),
+                        "app": web_info.get("app", ""),
+                        "header": web_info.get("header", ""),
+                        "body": web_info.get("body", "")
                     })
     
     with open("data/scan_results.csv", "w", newline="", encoding="utf-8") as f:
@@ -77,4 +82,6 @@ def main():
     print(f"Pemindaian selesai. Hasil disimpan di data/scan_results.csv. Total: {len(results)} entri.")
 
 if __name__ == "__main__":
+    # Menonaktifkan peringatan SSL
+    requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
     main()
