@@ -11,7 +11,7 @@
         <a href="/">Kembali ke Beranda</a>
         <h1>Hasil Pencarian</h1>
         {% if results %}
-            <a href="{{ url_for('download', query=request.form.get('query')) }}" class="download-btn">Unduh Hasil</a>
+            <a href="{{ url_for('download', query=query) }}" class="download-btn">Unduh Hasil</a>
             <table>
                 <thead>
                     <tr>
