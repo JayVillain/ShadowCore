@@ -4,44 +4,88 @@ import io
 
 app = Flask(__name__)
 
+def filter_results_advanced(data, query_string):
+    results = []
+    
+    # Memisahkan kueri berdasarkan operator AND (&&)
+    and_parts = [p.strip() for p in query_string.split('&&')]
+    
+    for row in data:
+        overall_match = True
+        
+        for and_part in and_parts:
+            # Memisahkan kueri berdasarkan operator OR (||)
+            or_parts = [p.strip() for p in and_part.split('||')]
+            or_match = False
+            
+            for or_part in or_parts:
+                part = or_part.strip()
+                if not part:
+                    continue
+
+                if '=' in part:
+                    key, value = part.split('=', 1)
+                    key = key.strip().lower()
+                    value = value.strip('"').strip("'").lower()
+                    
+                    row_value = row.get(key, '').lower()
+                    if row_value and value in row_value:
+                        or_match = True
+                        break
+                else: # Pencarian kata kunci umum
+                    keyword = part.lower()
+                    if (keyword in row['ip'].lower() or
+                        (row['title'] and keyword in row['title'].lower())):
+                        or_match = True
+                        break
+
+            if not or_match:
+                overall_match = False
+                break
+        
+        if overall_match:
+            results.append(row)
+            
+    return results
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/search', methods=['POST'])
+@app.route('/search', methods=['POST', 'GET'])
 def search():
-    query = request.form.get('query', '').lower()
-    results = []
+    query = request.form.get('query', '')
+    if not query:
+        query = request.args.get('query', '')
+
+    all_data = []
     try:
         with open("data/scan_results.csv", "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            for row in reader:
-                # Logika pencarian sederhana
-                if query in row['ip'].lower() or \
-                   (row['title'] and query in row['title'].lower()):
-                    results.append(row)
+            all_data = list(reader)
     except FileNotFoundError:
         return "File data/scan_results.csv tidak ditemukan. Jalankan crawler.py terlebih dahulu.", 404
-        
-    return render_template('results.html', results=results)
+
+    results = filter_results_advanced(all_data, query)
+    
+    return render_template('results.html', results=results, query=query)
 
 @app.route('/download')
 def download():
-    query = request.args.get('query', '').lower()
-    results = []
+    query = request.args.get('query', '')
+    all_data = []
+
     try:
         with open("data/scan_results.csv", "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            for row in reader:
-                if query in row['ip'].lower() or \
-                   (row['title'] and query in row['title'].lower()):
-                    results.append(row)
+            all_data = list(reader)
     except FileNotFoundError:
         return "File data/scan_results.csv tidak ditemukan.", 404
 
-    # Buat file CSV di memori
+    results = filter_results_advanced(all_data, query)
+
     output = io.StringIO()
-    fieldnames = ["ip", "port", "title"]
+    fieldnames = ["ip", "port", "title", "app", "header", "body"]
     writer = csv.DictWriter(output, fieldnames=fieldnames)
     writer.writeheader()
     writer.writerows(results)
