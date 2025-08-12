@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hasil Pencarian - ShadowCore</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <a href="/">Kembali ke Beranda</a>
+        <h1>Hasil Pencarian</h1>
+        {% if results %}
+            <a href="{{ url_for('download', query=request.form.get('query')) }}" class="download-btn">Unduh Hasil</a>
+            <table>
+                <thead>
+                    <tr>
+                        <th>IP</th>
+                        <th>Port</th>
+                        <th>Judul</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in results %}
+                    <tr>
+                        <td>{{ result.ip }}</td>
+                        <td>{{ result.port }}</td>
+                        <td>{{ result.title }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Tidak ada hasil yang ditemukan.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
