@@ -1,0 +1,14 @@
+ShadowCore-project/
+├── app.py
+├── crawler.py
+├── requirements.txt
+├── data/
+│   └── scan_results.csv
+├── templates/
+│   ├── index.html
+│   └── results.html
+└── static/
+    ├── css/
+    │   └── style.css
+    └── js/
+        └── main.js
