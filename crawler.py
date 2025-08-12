@@ -6,8 +6,8 @@ import base64
 import time
 
 # Ganti dengan email dan API key Anda
-fofa_email = "masukkan_email_anda_di_sini"
-fofa_key = "masukkan_kunci_api_anda_di_sini"
+fofa_email = "bakagusi23@gmail.com"
+fofa_key = "7423571a9d91c7a87e1ef776442fa18a"
 
 def get_fofa_data(query_string, page=1, size=100):
     print(f"Mencoba menghubungi API FOFA...")
