@@ -1,6 +1,9 @@
+# app.py (versi diperbaiki)
+
 from flask import Flask, render_template, request, send_file
 import csv
 import io
+import re
 
 app = Flask(__name__)
 
@@ -8,14 +11,14 @@ def filter_results_advanced(data, query_string):
     results = []
     
     # Memisahkan kueri berdasarkan operator AND (&&)
-    and_parts = [p.strip() for p in query_string.split('&&')]
+    and_parts = re.split(r'\s*&&\s*', query_string)
     
     for row in data:
         overall_match = True
         
         for and_part in and_parts:
             # Memisahkan kueri berdasarkan operator OR (||)
-            or_parts = [p.strip() for p in and_part.split('||')]
+            or_parts = re.split(r'\s*\|\|\s*', and_part)
             or_match = False
             
             for or_part in or_parts:
@@ -23,13 +26,14 @@ def filter_results_advanced(data, query_string):
                 if not part:
                     continue
 
-                if '=' in part:
-                    key, value = part.split('=', 1)
-                    key = key.strip().lower()
-                    value = value.strip('"').strip("'").lower()
+                # Cek apakah kueri memiliki format key="value"
+                match = re.match(r'(\w+)\s*=\s*"(.*)"', part)
+                if match:
+                    key = match.group(1).lower()
+                    value = match.group(2).lower()
                     
-                    row_value = row.get(key, '').lower()
-                    if row_value and value in row_value:
+                    row_value = str(row.get(key, '')).lower()
+                    if value in row_value:
                         or_match = True
                         break
                 else: # Pencarian kata kunci umum
