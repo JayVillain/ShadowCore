@@ -1,87 +1,66 @@
-# crawler.py (versi diperbaiki)
+# crawler.py (menggunakan API FOFA)
 
-import socket
 import requests
 import csv
-import ipaddress
+import base64
 import time
 
-def scan_port(ip, port):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(1)
-    try:
-        s.connect((ip, port))
-        return True
-    except (socket.timeout, socket.error):
-        return False
-    finally:
-        s.close()
+# Ganti dengan email dan API key Anda
+fofa_email = "EMAIL_ANDA"
+fofa_key = "KEY_API_ANDA"
 
-def get_web_info(ip, port):
-    protocol = "https" if port == 443 else "http"
+def get_fofa_data(query_string, page=1, size=100):
+    # Encode query string ke Base64 (sesuai format FOFA)
+    encoded_query = base64.b64encode(query_string.encode('utf-8')).decode('utf-8')
+    
+    url = f"https://fofa.info/api/v1/search/all?email={fofa_email}&key={fofa_key}&qbase64={encoded_query}&page={page}&size={size}"
+    
     try:
-        response = requests.get(f"{protocol}://{ip}", timeout=2, headers={'User-Agent': 'ShadowCore-Crawler'}, verify=False) # verify=False untuk HTTPS
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
-            title = None
-            if "<title>" in response.text:
-                start = response.text.find("<title>") + 7
-                end = response.text.find("</title>", start)
-                title = response.text[start:end].strip()
-
-            app = None
-            if 'wp-content' in response.text or 'WordPress' in response.text:
-                app = "WordPress"
-            elif 'cloudflare' in response.headers.get('Server', '').lower():
-                app = "Cloudflare"
-
-            header_str = str(response.headers)
-            body_str = response.text
-
-            return {
-                "title": title,
-                "app": app,
-                "header": header_str,
-                "body": body_str
-            }
-    except requests.RequestException:
+            data = response.json()
+            if data['error']:
+                print(f"Error dari API FOFA: {data['errmsg']}")
+                return None
+            return data
+        else:
+            print(f"Error: Status code {response.status_code}")
+            return None
+    except requests.RequestException as e:
+        print(f"Error saat menghubungi API: {e}")
         return None
-    return None
 
 def main():
-    target_ips = ["1.1.1.1", "8.8.8.8"] # Contoh IP. Ganti dengan rentang IP yang ingin Anda pindai.
-    ports_to_scan = [80, 443]
+    # Contoh kueri FOFA yang ingin Anda cari
+    fofa_query = 'app="WordPress" && (body="simple-file-list" || header="simple-file-list")'
     
-    results = []
+    print(f"Mencari dengan kueri: {fofa_query}")
+    fofa_results = []
     
-    print("Mulai pemindaian...")
+    # Ambil 100 hasil pertama (bisa disesuaikan)
+    data = get_fofa_data(fofa_query, size=100)
     
-    for ip_str in target_ips:
-        ip = ip_str
-        print(f"Memindai IP: {ip}")
-        
-        for port in ports_to_scan:
-            if scan_port(ip, port):
-                print(f"Port {port} terbuka!")
-                web_info = get_web_info(ip, port)
-                if web_info:
-                    results.append({
-                        "ip": ip,
-                        "port": port,
-                        "title": web_info.get("title", ""),
-                        "app": web_info.get("app", ""),
-                        "header": web_info.get("header", ""),
-                        "body": web_info.get("body", "")
-                    })
+    if data and 'results' in data:
+        print(f"Ditemukan {len(data['results'])} hasil.")
+        for item in data['results']:
+            # Item dalam format FOFA adalah: ['ip', 'port', 'title', 'header', 'body']
+            # Anda perlu menyesuaikan format ini ke format CSV Anda
+            fofa_results.append({
+                "ip": item[0],
+                "port": item[1],
+                "title": item[2],
+                "header": item[3],
+                "body": item[4],
+                "app": "WordPress" if "wordpress" in item[2].lower() or "wp-content" in item[4].lower() else ""
+            })
     
     with open("data/scan_results.csv", "w", newline="", encoding="utf-8") as f:
         fieldnames = ["ip", "port", "title", "app", "header", "body"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(results)
+        writer.writerows(fofa_results)
     
-    print(f"Pemindaian selesai. Hasil disimpan di data/scan_results.csv. Total: {len(results)} entri.")
+    print(f"Penyimpanan data selesai. Total: {len(fofa_results)} entri.")
 
 if __name__ == "__main__":
-    # Menonaktifkan peringatan SSL
-    requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
     main()
