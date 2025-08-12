@@ -1,4 +1,4 @@
-# app.py (versi diperbaiki)
+# app.py (versi modifikasi)
 
 from flask import Flask, render_template, request, send_file
 import csv
@@ -7,49 +7,38 @@ import re
 
 app = Flask(__name__)
 
+# Fungsi untuk memfilter hasil pencarian (tidak berubah)
 def filter_results_advanced(data, query_string):
     results = []
-    
-    # Memisahkan kueri berdasarkan operator AND (&&)
     and_parts = re.split(r'\s*&&\s*', query_string)
-    
     for row in data:
         overall_match = True
-        
         for and_part in and_parts:
-            # Memisahkan kueri berdasarkan operator OR (||)
             or_parts = re.split(r'\s*\|\|\s*', and_part)
             or_match = False
-            
             for or_part in or_parts:
                 part = or_part.strip()
                 if not part:
                     continue
-
-                # Cek apakah kueri memiliki format key="value"
                 match = re.match(r'(\w+)\s*=\s*"(.*)"', part)
                 if match:
                     key = match.group(1).lower()
                     value = match.group(2).lower()
-                    
                     row_value = str(row.get(key, '')).lower()
                     if value in row_value:
                         or_match = True
                         break
-                else: # Pencarian kata kunci umum
+                else:
                     keyword = part.lower()
-                    if (keyword in row['ip'].lower() or
-                        (row['title'] and keyword in row['title'].lower())):
+                    if (keyword in str(row['ip']).lower() or
+                        (row['title'] and keyword in str(row['title']).lower())):
                         or_match = True
                         break
-
             if not or_match:
                 overall_match = False
                 break
-        
         if overall_match:
             results.append(row)
-            
     return results
 
 @app.route('/')
@@ -72,7 +61,10 @@ def search():
 
     results = filter_results_advanced(all_data, query)
     
-    return render_template('results.html', results=results, query=query)
+    # Ambil hanya IP dan Port untuk ditampilkan
+    display_results = [{'ip': r['ip'], 'port': r['port'], 'title': r.get('title', '')} for r in results]
+    
+    return render_template('results.html', results=display_results, query=query)
 
 @app.route('/download')
 def download():
@@ -89,17 +81,23 @@ def download():
     results = filter_results_advanced(all_data, query)
 
     output = io.StringIO()
-    fieldnames = ["ip", "port", "title", "app", "header", "body"]
-    writer = csv.DictWriter(output, fieldnames=fieldnames)
-    writer.writeheader()
-    writer.writerows(results)
+    # Hanya kolom URL yang akan diunduh
+    writer = csv.writer(output)
+    writer.writerow(["URL"])
+
+    for row in results:
+        ip = row['ip']
+        port = row['port']
+        protocol = "https" if str(port) == "443" else "http"
+        url = f"{protocol}://{ip}:{port}"
+        writer.writerow([url])
     
     output.seek(0)
     
     return send_file(io.BytesIO(output.getvalue().encode('utf-8')),
                      mimetype='text/csv',
                      as_attachment=True,
-                     download_name='shadowcore_results.csv')
+                     download_name='shadowcore_urls.csv')
 
 if __name__ == '__main__':
     app.run(debug=True)
